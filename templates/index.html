@@ -1,0 +1,583 @@
+﻿<!DOCTYPE html>
+<html lang="zh">
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>✨ 数据分级系统 ✨</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        /* 高级背景 - 霓虹渐变 */
+        body {
+            background: radial-gradient(ellipse at center, #5c5cfd 0%, #b6bbca 60%, #0f3460 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: "Poppins", sans-serif;
+            color: #fff;
+        }
+
+        /* 玻璃拟态卡片 */
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        /* 卡片标题 */
+        .card-header {
+            background: linear-gradient(135deg, #8775ff 0%, #dab3f0 100%);
+            font-size: 1.5rem;
+            font-weight: bold;
+            text-align: center;
+            color: white;
+            border-radius: 15px 15px 0 0;
+        }
+
+        /* 按钮动画 */
+        .btn {
+            background: linear-gradient(135deg, #00f260 0%, #0575e6 100%);
+            border: none;
+            color: white;
+            transition: all 0.3s ease-in-out;
+        }
+
+        .btn:hover {
+            transform: scale(1.08);
+            background: linear-gradient(135deg, #0575e6 0%, #00f260 100%);
+        }
+
+        /* 表格样式 */
+        /* 优化表单背景 */
+        .table {
+            background: rgba(42, 45, 62, 0.9); /* 深灰色 + 透明度 */
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        /* 表头样式 */
+        .table th {
+            background: #4e61bd; /* 提高亮度，增加对比 */
+            color: #ffffff;
+            font-weight: bold;
+            text-align: center;
+            padding: 12px;
+            border-bottom: 2px solid #4a4d5e;
+        }
+
+        /* 表格单元格 */
+        .table td {
+            background: rgba(50, 54, 70, 0.8);
+            color: #f0f0f0; /* 亮色字体 */
+            text-align: center;
+            padding: 12px;
+            border-bottom: 1px solid #4a4d5e;
+        }       
+
+        /* 悬停效果 */
+        .table tbody tr:hover {
+            background: rgba(255, 255, 255, 0.1); /* 轻微亮度变化 */
+        }
+
+        
+        /* GIF 容器 */
+        .gif-container {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+
+
+<body>
+    <div class="container mt-5">
+        <div class="card shadow">
+            <div class="container">
+                <div class="card">
+                    <div class="card-header"> 数据分级系统 </div>
+                    <div class="card-body">
+                        <div class="gif-container">
+                            <img src="https://media.giphy.com/media/iIqmM5tTjmpOB9mpbn/giphy.gif" width="150">
+                        </div>
+                        <p class="text-center">欢迎使用数据分级系统，请上传您的数据进行分析。</p>
+                    </div>
+                </div>
+            </div>
+
+                <!-- 上传表单 -->
+                <form action="/" method="POST" enctype="multipart/form-data" class="mb-3">
+                    <div class="mb-3">
+                        <label for="file" class="form-label">📂 请选择 CSV 文件：</label>
+                        <input type="file" name="file" id="file" class="form-control">
+                    </div>
+                    <button type="submit" class="btn btn-success w-100"> 开始分级</button>
+                </form>
+
+                {% if error %}
+                <div class="alert alert-danger text-center">{{ error }}</div>
+                {% endif %}
+
+                <script>
+                    document.getElementById('uploadForm').addEventListener('submit', function (e) {
+                        e.preventDefault(); // 阻止默认表单提交行为
+
+                        const formData = new FormData(this);
+                        const file = formData.get('file');
+
+                        if (!file) {
+                            alert('请选择文件');
+                            return;
+                        }
+
+                        // 使用 Fetch API 发送 POST 请求上传文件
+                        fetch(this.action, {
+                            method: this.method,
+                            body: formData
+                        })
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.error) {
+                                    alert(data.error);
+                                    return;
+                                }
+
+                                // 文件上传成功后，发送 POST 请求到 /download
+                                fetch('/download', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                    },
+                                    body: JSON.stringify({
+                                        original: data.results,
+                                        modifications: []
+                                    })
+                                })
+                                    .then(response => response.blob())
+                                    .then(blob => {
+                                        const url = window.URL.createObjectURL(blob);
+                                        const a = document.createElement('a');
+                                        a.href = url;
+                                        a.download = 'modified_results.csv';
+                                        document.body.appendChild(a);
+                                        a.click();
+                                        window.URL.revokeObjectURL(url);
+                                    })
+                                    .catch(error => {
+                                        console.error('下载文件时出错:', error);
+                                        alert('下载文件时出错');
+                                    });
+                            })
+                            .catch(error => {
+                                console.error('上传文件时出错:', error);
+                                alert('上传文件时出错');
+                            });
+                    });
+                </script>
+
+
+                {% if results %}
+                <!-- 数据分级参考表 -->
+                <table class="table table-bordered table-striped">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>📚 大类  </th>
+                            <th>📑 子类</th>
+                            <th> 📝 内容 </th>
+                            <th>🔖数据级别  </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                <!-- 原表格内容 -->
+                        <tr><td rowspan="5">个人属性数据</td><td>人口统计信息</td><td>姓名、出生日期、性别、民族等</td><td>2</td></tr>
+                        <tr><td>个人身份信息</td><td>身份证、社保卡号、住院号等</td><td>3</td></tr>
+                        <tr><td>个人通讯信息</td><td>电话号码、邮箱、账号等</td><td>3</td></tr>
+                        <tr><td>个人生物识别信息</td><td>指纹、虹膜、面部特征等</td><td>3</td></tr>
+                        <tr><td>个人信用记录信息</td><td>信用评分、信用报告等</td><td>2</td></tr>
+                        <!-- 健康状况数据 -->
+                        <tr><td>健康状况数据</td><td>-</td><td>主诉、现病史、既往病史、体检检查(体征)、家族史、症状、检验检查数据、遗传咨询数据、可穿戴设备采集的健康相关数据、生活方式、基因测序、蛋白质分析测定、代谢小分子检测、人体微生物检测等</td><td>2</td></tr>
+
+                        <!-- 医疗应用数据 -->
+                        <tr><td>医疗应用数据</td><td>-</td><td>门（急）诊病历、住院医嘱、检查检验报告、用药信息、病理记录、手术记录、麻醉记录、出院小结、转诊（院）记录、知情告知信息等</td><td>2</td></tr>
+
+                        <!-- 医疗支付数据 -->
+                        <tr><td rowspan="2">医疗支付数据</td><td>医疗交易信息</td><td>支付信息、消费金额、交易记录等</td><td>3</td></tr>
+                        <tr><td>保险信息</td><td>保险账号、保险状态、保险金额等</td><td>2</td></tr>
+
+                        <!-- 卫生资源数据 -->
+                        <tr><td rowspan="2">卫生资源数据</td><td>医院基本数据</td><td>医疗机构名称、类别、学科门类、床位数、地址、电话等</td><td>1</td></tr>
+                        <tr><td>医院运营数据</td><td>人力资源、财务数据、物资数据、后勤数据、基础运行数据等</td><td>2</td></tr>
+
+                        <!-- 公共卫生数据 -->
+                        <tr><td rowspan="4">公共卫生数据</td><td>传染病疫情数据</td><td>病名、发病人数、发病率、死亡人数、死亡率、发病数据排名、死亡数据排名等</td><td>1</td></tr>
+                        <tr><td>疾病监测数据</td><td>传染病监测、非传染病流行病学监测等</td><td>2</td></tr>
+                        <tr><td>疾病预防数据</td><td>疫苗、应接种人数、实接种人数等</td><td>1</td></tr>
+                        <tr><td>出生死亡数据</td><td>出生人数、出生率、死亡人数、死亡率、自然增长数、自然增长率等</td><td>1</td></tr>
+                    </tbody>
+                </table>
+
+<!-- 新增分级标准表 -->
+                <h4 class="mt-4 text-center">📜 数据分级标准定义</h4>
+                <table class="table table-bordered table-striped">
+                    <thead class="table-warning">
+                        <tr>
+                            <th>🏷️ 级别</th>
+                            <th>📌 标识颜色</th>
+                            <th>📐 标准定义</th>
+                            <th>🔒 保护要求</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>1级</td>
+                            <td><span class="badge bg-success">绿色</span></td>
+                            <td>公开数据：不包含敏感信息，可自由共享（如机构基础信息）</td>
+                            <td>基础加密，定期备份</td>
+                        </tr>
+                        <tr>
+                            <td>2级</td>
+                            <td><span class="badge bg-primary">蓝色</span></td>
+                            <td>内部数据：含一般隐私信息，需授权访问（如健康档案）</td>
+                            <td>访问审计，传输加密</td>
+                        </tr>
+                        <tr>
+                            <td>3级</td>
+                            <td><span class="badge bg-danger">红色</span></td>
+                            <td>敏感数据：高价值隐私信息，严格管控（如生物特征）</td>
+                            <td>双重认证，脱敏处理</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <h4 class="mt-4 text-center">📊 预测结果：</h4>
+                <div class="table-responsive">
+                    <table class="table table-bordered table-striped">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>📖 文本</th>
+                                <th>🖊️ 预测级别</th>
+                                <th>🔍 置信度</th>
+                            </tr>
+                        </thead>
+                        <tbody id="editableTable">
+                            {% for result in results %}
+                            <tr data-original-level="{{ result.label }}">
+                                <td>{{ result.text }}</td>
+                                <td class="editable-level" contenteditable="true" data-level="{{ result.label }}" style="cursor: pointer;"
+                                    onkeydown="return validateLevel(event, this)">
+                                    <span class="level-badge">{{ result.label }}</span>
+                                </td>
+                                <td>{{ result.score }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    
+                    <!-- 在下载按钮上方添加保存状态提示 -->
+                    <div id="editStatus" class="alert alert-info text-center" style="display:none">
+                        已修改 <span id="modifiedCount">0</span> 条记录
+                        <button onclick="resetAll()" class="btn btn-sm btn-warning ms-2">↻ 重置</button>
+                    </div>
+                    
+                    <script>
+                        // 修改记录存储
+                        let modifications = new Map();
+
+                        // 级别验证
+                        function validateLevel(event, cell) {
+                            const key = event.key.toUpperCase();
+                            if (key === '1' || key === '2' || key === '3') {
+                                const newLevel = key + '级';
+                                updateLevel(cell, newLevel);
+                                return false; // 阻止默认输入
+                            }
+                            event.preventDefault();
+                            return false;
+                        }
+
+                        function updateLevel(cell, level) {
+                                const row = cell.closest('tr');
+                                const index = row.rowIndex - 1; // 假设第一行是表头
+                                const originalLevel = row.dataset.originalLevel;
+
+                                // 更新显示
+                                cell.querySelector('.level-badge').className = `level-badge badge bg-${getLevelColor(level)}`;
+                                cell.querySelector('.level-badge').textContent = level;
+
+                                // 记录修改
+                                if (level !== originalLevel) {
+                                    modifications.set(index, level);
+                                } else {
+                                    modifications.delete(index);
+                                }
+
+                                // 更新状态提示
+                                updateStatus();
+                            }
+
+
+                        // 获取级别颜色
+                        function getLevelColor(level) {
+                            const colors = { '1级': 'success', '2级': 'primary', '3级': 'danger' };
+                            return colors[level] || 'secondary';
+                        }
+
+                        // 更新状态提示
+                        function updateStatus() {
+                            const statusDiv = document.getElementById('editStatus');
+                            statusDiv.style.display = modifications.size > 0 ? 'block' : 'none';
+                            document.getElementById('modifiedCount').textContent = modifications.size;
+                        }
+
+                        // 重置所有修改
+                        function resetAll() {
+                            document.querySelectorAll('.editable-level').forEach(cell => {
+                                const original = cell.closest('tr').dataset.originalLevel;
+                                cell.querySelector('.level-badge').className = `level-badge badge bg-${getLevelColor(original)}`;
+                                cell.querySelector('.level-badge').textContent = original;
+                            });
+                            modifications.clear();
+                            updateStatus();
+                        }
+                        
+                        // 修改下载按钮事件
+                        document.querySelector('[href="{{ url_for('download_unmodified') }}"]').addEventListener('click', function (e) {
+                            e.preventDefault();
+
+                            console.log("下载按钮被点击");
+
+                            // 检查是否有修改
+                            if (modifications.size > 0) {
+                                console.log("检测到有修改，调用 download_modified");
+
+                                // 构建修改数据
+                                const modifiedData = Array.from(modifications).map(([index, level]) => ({
+                                    index: parseInt(index),
+                                    level: level
+                                }));
+
+                                console.log("构建的修改数据:", modifiedData);
+
+                                // 发送到后端的 download_modified 函数
+                                fetch("{{ url_for('download_modified') }}", {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        modifications: modifiedData,
+                                        original: {{ results| tojson | safe }}
+                            })
+                        }).then(response => {
+                                console.log("收到后端响应:", response);
+                                if (!response.ok) {
+                                    throw new Error('网络响应不正常');
+                                }
+                                return response.blob();
+                            })
+                                .then(blob => {
+                                    console.log("成功获取文件数据");
+                                    const url = window.URL.createObjectURL(blob);
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = 'modified_results.csv';
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    window.URL.revokeObjectURL(url);
+                                    console.log("文件下载完成");
+                                })
+                                .catch(error => {
+                                    console.error('下载过程中出现问题:', error);
+                                });
+                            } else {
+                                console.log("没有修改，调用 download_unmodified");
+
+                                // 如果没有修改，调用原来的 download_unmodified
+                                fetch("{{ url_for('download_unmodified') }}")
+                                    .then(response => {
+                                        console.log("收到后端响应:", response);
+                                        return response.blob();
+                                    })
+                                    .then(blob => {
+                                        console.log("成功获取文件数据");
+                                        const url = window.URL.createObjectURL(blob);
+                                        const a = document.createElement('a');
+                                        a.href = url;
+                                        a.download = 'original_results.csv';
+                                        document.body.appendChild(a);
+                                        a.click();
+                                        window.URL.revokeObjectURL(url);
+                                        console.log("文件下载完成");
+                                    })
+                                    .catch(error => {
+                                        console.error('下载过程中出现问题:', error);
+                                    });
+                            }
+                        });
+                    </script>
+                    
+                    <style>
+                        .editable-level:hover {
+                            background: rgba(255, 255, 0, 0.1) !important;
+                        }
+                    
+                        .level-badge {
+                            font-size: 0.9em;
+                            padding: 0.35em 0.65em;
+                            border-radius: 1rem;
+                        }
+                    </style>
+                </div>
+
+                <!-- 柱状图 -->
+                <!-- 将原有柱状图替换为以下代码 -->
+                <h4 class="mt-4 text-center">📈 置信度分布分析</h4>
+                <canvas id="confidenceChart"></canvas>
+                
+                <script>
+                    document.addEventListener("DOMContentLoaded", function () {
+                        // 数据准备
+                        var levelData = {
+                            "1级": [],
+                            "2级": [],
+                            "3级": []
+                        };
+
+                        {% for result in results %}
+                        levelData["{{ result.label }}"].push(parseFloat("{{ result.score }}"));
+                        {% endfor %}
+
+                        // 生成核密度曲线数据
+                        function kernelDensityEstimator(kernel, X) {
+                            return function (V) { return X.map(function (x) { return [x, d3.mean(V, function (v) { return kernel(x - v); })]; }); };
+                        }
+
+                        function epanechnikovKernel(scale) {
+                            return function (u) {
+                                return Math.abs(u /= scale) <= 1 ? 0.75 * (1 - u * u) / scale : 0;
+                            };
+                        }
+
+                        // 配置图表
+                        var ctx = document.getElementById('confidenceChart').getContext('2d');
+                        new Chart(ctx, {
+                            type: 'scatter',
+                            data: {
+                                datasets: [
+                                    // 1级数据
+                                    {
+                                        label: '1级置信度分布',
+                                        data: levelData["1级"].map(v => ({ x: v, y: 0.2 })),
+                                        backgroundColor: 'rgba(99, 255, 132, 0.6)',
+                                        pointRadius: 4,
+                                        showLine: false
+                                    },
+                                    // 2级数据 
+                                    {
+                                        label: '2级置信度分布',
+                                        data: levelData["2级"].map(v => ({ x: v, y: 0.5 })),
+                                        backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                                        pointRadius: 4,
+                                        showLine: false
+                                    },
+                                    // 3级数据
+                                    {
+                                        label: '3级置信度分布',
+                                        data: levelData["3级"].map(v => ({ x: v, y: 0.8 })),
+                                        backgroundColor: 'rgba(255, 99, 132, 0.6)',
+                                        pointRadius: 4,
+                                        showLine: false
+                                    },
+                                    // 核密度曲线
+                                    {
+                                        label: '密度曲线',
+                                        data: Object.values(levelData).flat().map(v => ({ x: v, y: 0 })),
+                                        type: 'line',
+                                        borderColor: '#666',
+                                        borderWidth: 2,
+                                        pointRadius: 0,
+                                        tension: 0.4,
+                                        fill: {
+                                            target: 'origin',
+                                            above: 'rgba(200, 200, 200, 0.2)'
+                                        }
+                                    }
+                                ]
+                            },
+                            options: {
+                                responsive: true,
+                                scales: {
+                                    x: {
+                                        title: { display: true, text: '置信度分数' },
+                                        min: 0,
+                                        max: 1
+                                    },
+                                    y: {
+                                        display: false,
+                                        min: -0.5,
+                                        max: 1.5
+                                    }
+                                },
+                                plugins: {
+                                    tooltip: {
+                                        callbacks: {
+                                            label: function (ctx) {
+                                                return ctx.dataset.label + ': ' + ctx.parsed.x.toFixed(2);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    });
+                </script>
+                
+
+                <a href="{{ url_for('download_unmodified') }}" class="btn btn-info w-100 mt-3">📥 下载预测结果</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {% if results %}
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            var labels = ["1级", "2级", "3级"];
+            var counts = [0, 0, 0];
+
+            {% for result in results %}
+                var label = "{{ result.label }}";
+                if (label === "1级") counts[0]++;
+                else if (label === "2级") counts[1]++;
+                else if (label === "3级") counts[2]++;
+            {% endfor %}
+
+            var ctx = document.getElementById('predictionChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '预测结果数量',
+                        data: counts,
+                        backgroundColor: ['#ff9999', '#66b3ff', '#99ff99'],
+                        borderColor: ['#ff4d4d', '#3385ff', '#33cc33'],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        });
+    </script>
+    {% endif %}
+</body>
+</html>
